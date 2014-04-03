@@ -1048,6 +1048,7 @@ static ssize_t store_boost(struct kobject *kobj, struct attribute *attr,
 		if (!boosted)
 			cpufreq_interactive_boost();
 	} else {
+		boostpulse_endtime = ktime_to_us(ktime_get());
 		trace_cpufreq_interactive_unboost("off");
 	}
 
