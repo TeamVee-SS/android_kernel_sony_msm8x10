@@ -3766,6 +3766,8 @@ static int elan_ktf2k_ts_resume(struct device *dev)
 
 	printk(KERN_EMERG "%s \n", __func__);
 
+	elan_ktf2k_ts_hw_reset(private_ts->client);
+
 	mutex_lock(&private_ts->lock); // set lock
 
 	if (tp_sleep_status == 0) {
