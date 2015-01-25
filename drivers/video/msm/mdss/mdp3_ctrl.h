@@ -33,6 +33,30 @@ struct mdp3_buffer_queue {
 	int pop_idx;
 };
 
+#ifdef CONFIG_FB_MSM_MDSS_MDP3_KCAL_CTRL
+#define R_MASK  0xff0000
+#define G_MASK  0xff00
+#define B_MASK  0xff
+#define R_SHIFT 16
+#define G_SHIFT 8
+#define B_SHIFT 0
+
+#define NUM_QLUT 256
+#define MAX_KCAL_V (NUM_QLUT - 1)
+
+#define lut2rgb(lut,mask,shift) ((lut & mask) >> shift)
+#define scaled_by_kcal(rgb, kcal) \
+    (((((unsigned int)(rgb) * (unsigned int)(kcal)) << 16) / \
+        (unsigned int)MAX_KCAL_V) >> 16)
+
+struct kcal_lut_data {
+	int red;
+	int green;
+	int blue;
+	int minimum;
+};
+#endif
+
 struct mdp3_session_data {
 	struct mutex lock;
 	int status;
@@ -67,6 +91,10 @@ struct mdp3_session_data {
 	bool dma_active;
 	struct completion dma_completion;
 	int (*wait_for_dma_done)(struct mdp3_session_data *session);
+
+#ifdef CONFIG_FB_MSM_MDSS_MDP3_KCAL_CTRL
+	struct kcal_lut_data lut_data;
+#endif
 };
 
 int mdp3_ctrl_init(struct msm_fb_data_type *mfd);
