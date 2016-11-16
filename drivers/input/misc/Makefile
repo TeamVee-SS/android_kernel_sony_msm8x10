@@ -71,3 +71,4 @@ obj-$(CONFIG_INPUT_CT406)               += ct406.o
 obj-$(CONFIG_INPUT_VALIDITY_METALLICA)	+= vfsSpiDrv.o
 obj-$(CONFIG_SENSORS_STK3X1X_MOTO)      += stk3x1x_moto.o
 obj-$(CONFIG_INPUT_EPL6881)		+= epl6881.o
+obj-$(CONFIG_INPUT_BMA250E)		+= bma250e.o
