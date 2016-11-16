@@ -679,6 +679,16 @@ config UID_CPUTIME
 	help
 	  Per UID based cpu time statistics exported to /proc/uid_cputime
 
+config ARIMA_GPS_ELNA
+	tristate "GPS eLNA driver"
+	default n
+	---help---
+	  Say yes if you want GPS eLNA driver.
+	  If unsure, say N here.
+
+	  To compile this driver as a module, choose m here. The module will
+	  be called gps_elna.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
