@@ -211,6 +211,11 @@ ifneq ($(CONFIG_MMI_DEVICE_DTBS),y)
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-v2-qrd-skuab.dtb
 endif
 
+# Do no include Motorola MSM8610 in Shuang Board
+ifeq ($(CONFIG_MACH_SONY_SHUANG),y)
+dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-shuang-v2-mtp.dtb
+else
+
 # MSM8610 Motorola Devices
 #dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0.dtb
 #dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0c.dtb
@@ -228,6 +233,7 @@ dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p2b1.dtb
 #dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p1.dtb
 #dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p2.dtb
 dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-otus-p2b.dtb
+endif
 
 # MSMSAMARIUM
    zreladdr-$(CONFIG_ARCH_MSMSAMARIUM)	:= 0x00008000
