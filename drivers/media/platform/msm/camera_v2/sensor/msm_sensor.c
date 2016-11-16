@@ -1803,6 +1803,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 		break;
 	}
 
+#ifndef CONFIG_MACH_SONY_SHUANG
 	case CFG_GET_MODULE_INFO: {
 		if (s_ctrl->func_tbl->sensor_get_module_info == NULL) {
 			pr_err("%s: sensor_get_module_info is null!\n",
@@ -1853,6 +1854,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 
 		break;
 	}
+#endif
 	default:
 		rc = -EFAULT;
 		break;

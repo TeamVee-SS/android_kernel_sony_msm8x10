@@ -392,6 +392,8 @@ struct msm_sensor_init_params {
 	enum camb_position_t position;
 	/* sensor mount angle */
 	uint32_t            sensor_mount_angle;
+	/* sensor hawdware version */
+	int HW_VERSION;
 };
 
 struct var_fps_range_t {
@@ -483,12 +485,20 @@ enum msm_sensor_cfg_type_t {
 	CFG_SET_WHITE_BALANCE,
 	CFG_SET_AUTOFOCUS,
 	CFG_CANCEL_AUTOFOCUS,
+#ifndef CONFIG_MACH_SONY_SHUANG 
 	CFG_SET_GAMMA,
 	CFG_SET_LENS_SHADING,
 	CFG_SET_TARGET_EXPOSURE,
 	CFG_SET_FPS_RANGE,
 	CFG_GET_MODULE_INFO,
 	CFG_GET_LENS_SHADING,
+#else
+	CFG_SET_BRIGHTNESS,
+	CFG_GET_SHUTTER,
+	CFG_GET_GAIN,
+	CFG_GET_ISO,
+	CFG_SET_AUTO_BESTSHOT_MODE,
+#endif
 };
 
 enum msm_actuator_cfg_type_t {
