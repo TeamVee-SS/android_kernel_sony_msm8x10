@@ -36,6 +36,10 @@
 #include "mdss_fb.h"
 #include "dsi_v2.h"
 
+#ifdef CONFIG_LEDS_LM3533
+#include <linux/leds-lm3533.h>
+#endif
+
 #define DT_CMD_HDR 6
 #define DROPBOX_DISPLAY_ISSUE "display_issue"
 #define ESD_DROPBOX_MSG "ESD event detected"
@@ -424,7 +428,11 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	switch (ctrl_pdata->bklt_ctrl) {
 	case BL_WLED:
+#ifdef CONFIG_LEDS_LM3533
+		lm3533_backlight_control(bl_level);
+#else
 		led_trigger_event(bl_led_trigger, bl_level);
+#endif
 		break;
 	case BL_PWM:
 		mdss_dsi_panel_bklt_pwm(ctrl_pdata, bl_level);

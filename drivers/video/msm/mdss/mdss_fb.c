@@ -53,6 +53,13 @@
 
 #include "mdss_fb.h"
 
+#ifdef CONFIG_LEDS_LM3533
+#include <linux/gpio.h>
+#include <linux/leds-lm3533.h>
+
+static int LCD_init = 0;
+#endif
+
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
 #else
@@ -999,6 +1006,13 @@ int mdss_fb_blank_sub(int blank_mode, struct fb_info *info, int op_enable)
 	case FB_BLANK_UNBLANK:
 		if (!mfd->panel_power_on && mfd->mdp.on_fnc) {
 			int panel_dead = mfd->panel_info->panel_dead;
+
+#ifdef CONFIG_LEDS_LM3533
+			if (LCD_init == 0) {
+				lm3533_backlight_control(0);
+				LCD_init = 1;
+			}
+#endif
 			ret = mfd->mdp.on_fnc(mfd);
 			if (ret == 0) {
 				mfd->panel_power_on = true;
@@ -1741,9 +1755,14 @@ static int mdss_fb_release_all(struct fb_info *info, struct file *file)
 
 	if (!mfd->ref_cnt) {
 		if (mfd->disp_thread) {
+#ifndef CONFIG_LEDS_LM3533
 			kthread_stop(mfd->disp_thread);
+#endif
 			mfd->disp_thread = NULL;
 		}
+#ifdef CONFIG_LEDS_LM3533
+		lm3533_backlight_control(0);
+#endif
 
 		/*
 		 * Turn off back light of video panel to make possible artifacts
@@ -2111,6 +2130,12 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 			pr_err("pan display failed %x on fb%d\n", ret,
 					mfd->index);
 	}
+#ifdef CONFIG_LEDS_LM3533
+	if (LCD_init == 0) {
+		lm3533_backlight_control(0);
+		LCD_init = 1;
+	}
+#endif
 	if (!ret)
 		mdss_fb_update_backlight(mfd);
 
