@@ -15,6 +15,61 @@
 		status = "ok";
 	};
 
+	i2c@f9923000 {
+		elan_ktf2k_ts@15 {
+			compatible = "elan,ktf2k_ts";
+			reg = <0x15>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <1 0x2>;
+			vdd_ana-supply = <&pm8110_l19>;
+			vcc_i2c-supply = <&pm8110_l14>;
+			elan,reset-gpio = <&msmgpio 0 0x00>;
+			elan,irq-gpio = <&msmgpio 1 0x00>;
+			elan,hw-det-gpio = <&msmgpio 7 0x00>;
+			elan,i2c-pull-up;
+		};
+	};
+
+	i2c@f9925000 {
+		bma250e@18 {
+			compatible = "accelerometer,bma250e";
+			reg = <0x18>;
+			vdd_ana-supply = <&pm8110_l19>;
+			vcc_i2c-supply = <&pm8110_l14>;
+		};
+		epl6881@49 {
+			compatible = "proximity,epl6811";
+			reg = <0x49>;
+			vdd_ana-supply = <&pm8110_l19>;
+			vcc_i2c-supply = <&pm8110_l14>;
+		};
+		akm8963@0D {
+			compatible = "magnetic,akm8963";
+			reg = <0x0D>;
+			vdd_ana-supply = <&pm8110_l19>;
+			vcc_i2c-supply = <&pm8110_l14>;
+		};
+		ti_lm3533_leds@36 {
+			compatible = "ti,lm3533_leds";
+			reg = <0x36>;
+			ti,hwen-gpio = <&msmgpio 18 0x00>;
+		};
+	};
+
+	nmi-isdbt {
+		compatible = "nmi,nmi325_isdbt";
+	};
+
+	spi@f9926000 {
+		nmi325@0 {
+			compatible = "nmi,nmispi";
+			reg = <0>;
+			spi-max-frequency = <5000000>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <0 90 0>;
+		};
+	};
+
 	gpio_keys {
 		compatible = "gpio-keys";
 		input-name = "gpio-keys";
@@ -24,6 +79,24 @@
 			gpios = <&msmgpio 72 0x1>;
 			linux,input-type = <1>;
 			linux,code = <115>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+
+		vol_down {
+			label = "volume_down";
+			gpios = <&msmgpio 73 0x1>;
+			linux,input-type = <1>;
+			linux,code = <114>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+
+		mp3 {
+			label = "mp3";
+			gpios = <&msmgpio 74 0x1>;
+			linux,input-type = <1>;
+			linux,code = <391>;
 			gpio-key,wakeup;
 			debounce-interval = <15>;
 		};
@@ -40,6 +113,17 @@
             "AMIC2", "MIC BIAS Internal2",
             "AMIC3", "MIC BIAS External";
     };
+
+	qcom,mdss_dsi_truly_wvga_video {
+		qcom,cont-splash-enabled;
+	};
+
+	gps_elna {
+		compatible = "arima,gps_elna";
+		elna,enable-gpio = <&msmgpio 63 0x00>;
+		vcc_elna_l16-supply = <&pm8110_l16>;
+		vcc_elna_l19-supply = <&pm8110_l19>;
+	};
 };
 
 &i2c_cdc  {
