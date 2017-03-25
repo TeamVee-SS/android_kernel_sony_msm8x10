@@ -198,6 +198,7 @@ initrd_phys-$(CONFIG_ARCH_FSM9XXX)	:= 0x12000000
    zreladdr-$(CONFIG_ARCH_MSM8610)	:= 0x00008000
 
 # Do not include QC default DTBs if not needed
+ifneq ($(CONFIG_MACH_SONY_SHUANG),y)
 ifneq ($(CONFIG_MMI_DEVICE_DTBS),y)
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-v1-cdp.dtb
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-v2-cdp.dtb
@@ -210,12 +211,14 @@ ifneq ($(CONFIG_MMI_DEVICE_DTBS),y)
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-v2-qrd-skuaa.dtb
         dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-v2-qrd-skuab.dtb
 endif
+endif
 
 # Do no include Motorola MSM8610 in Shuang Board
 ifeq ($(CONFIG_MACH_SONY_SHUANG),y)
 dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-shuang-v2-mtp.dtb
-else
+endif
 
+ifneq ($(CONFIG_MACH_SONY_SHUANG),y)
 # MSM8610 Motorola Devices
 #dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0.dtb
 #dtb-$(CONFIG_ARCH_MSM8610)	+= msm8610-condor-p0c.dtb
