@@ -454,7 +454,7 @@ int Update_FW_One(struct i2c_client *client, int recovery)
 
 	dev_dbg(&client->dev, "ic_num = [%d]\n", ic_num);
 
-IAP_RESTART:
+	IAP_RESTART:
 	data = I2C_DATA[0]; // Master
 	dev_dbg(&client->dev, "address data = [0x%x]\r\n", data);
 
@@ -496,7 +496,6 @@ IAP_RESTART:
 	if (res != sizeof(data)) {
 		dev_err(&client->dev, "dummy error code = %d\n", res);
 	}
-	mdelay(10);
 
 	// Start IAP
 	for (iPage = 1; iPage <= PageNum; iPage++) {
@@ -559,8 +558,6 @@ IAP_RESTART:
 			rewriteCnt = 0;
 			print_progress(iPage, ic_num, i);
 		}
-
-		mdelay(10);
 	}
 
 	dev_info(&client->dev, "read Hello packet data\n");
@@ -813,8 +810,6 @@ static int elan_ktf2k_ts_setup(struct i2c_client *client)
 		rc = __hello_packet_handler(client);
 		touch_retry--;
 	} while (rc == 0x88 && touch_retry > 0);
-
-	mdelay(10);
 
 	if (rc != 0x80 && rc != 0x88) {
 		rc = __fw_packet_handler(client);
