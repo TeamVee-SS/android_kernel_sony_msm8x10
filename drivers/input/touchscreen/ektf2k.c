@@ -233,6 +233,7 @@ struct elan_ktf2k_ts_data {
 	struct miscdevice firmware;
 #if defined(CONFIG_FB)
 	struct notifier_block fb_notif;
+	int elan_is_suspend;
 #endif
 };
 static struct elan_ktf2k_ts_data *private_ts;
@@ -3732,6 +3733,13 @@ static int elan_ktf2k_ts_suspend(struct device *dev)
 
 	printk(KERN_EMERG "%s \n", __func__);
 
+#if defined(CONFIG_FB)
+	if (private_ts->elan_is_suspend) {
+		pr_info("%s: Already in suspend state.\n", __func__);
+		return 0;
+	}
+#endif
+
 	mutex_lock(&private_ts->lock); // set lock
 	if (tp_sleep_status == 1) {
 		if (power_lock == 0) /* The power_lock can be removed when
@@ -3750,6 +3758,11 @@ static int elan_ktf2k_ts_suspend(struct device *dev)
 		tp_sleep_status = 0;
 	}
 	mutex_unlock(&private_ts->lock); // release lock
+
+#if defined(CONFIG_FB)
+	private_ts->elan_is_suspend = 1;
+#endif
+
 	return 0;
 }
 
@@ -3765,6 +3778,13 @@ static int elan_ktf2k_ts_resume(struct device *dev)
 	//	struct elan_ktf2k_ts_data *ts = i2c_get_clientdata(client);
 
 	printk(KERN_EMERG "%s \n", __func__);
+
+#if defined(CONFIG_FB)
+	if (!private_ts->elan_is_suspend) {
+		pr_info("%s: Already in awake state.\n", __func__);
+		return 0;
+	}
+#endif
 
 	elan_ktf2k_ts_hw_reset(private_ts->client);
 
@@ -3853,6 +3873,10 @@ static int elan_ktf2k_ts_resume(struct device *dev)
 		tp_sleep_status = 1;
 	}
 	mutex_unlock(&private_ts->lock); // release lock
+
+#if defined(CONFIG_FB)
+	private_ts->elan_is_suspend = 0;
+#endif
 
 	return 0;
 }
