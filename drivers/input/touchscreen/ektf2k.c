@@ -32,25 +32,24 @@
  *
  */
 
-/* The ELAN_PROTOCOL support normanl packet format */
+/* The ELAN_PROTOCOL support normal packet format */
 
 //#define ELAN_BUFFER_MODE
-//#define ELAN_TEN_FINGERS /* james check: Can not be use to auto-resolution
-// mapping */
+//#define ELAN_TEN_FINGERS /* James: Can't be use to auto-resolution mapping */
 //#define ELAN_PROTOCOL
 //#define ELAN_BUTTON
-//#define RE_CALIBRATION /* The Re-Calibration was designed for
-// ektf3k serial. */
+//#define RE_CALIBRATION /* The Re-Calibration was designed for ektf3k serial */
 //#define ELAN_2WIREICE
 //#define ELAN_POWER_SOURCE
-
 //#define PRODUCTION_TEST
 
 #include <asm/ioctl.h>
 #include <linux/cdev.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
+#endif
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
@@ -59,8 +58,11 @@
 #include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/of_gpio.h>
 #include <linux/platform_device.h>
 #include <linux/proc_fs.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/switch.h>
 #include <linux/uaccess.h>
@@ -72,19 +74,11 @@
 #endif
 
 /*[Arima Edison] add ++*/
-#include <linux/mutex.h>
-#include <linux/of_gpio.h>
-#include <linux/regulator/consumer.h>
 // Analog voltage @2.7 V
 #define ELAN_VTG_MIN_UV 2850000
 #define ELAN_VTG_MAX_UV 3300000 // 33
 #define ELAN_ACTIVE_LOAD_UA 15000
 #define ELAN_LPM_LOAD_UA 10
-// Analog voltage @1.8 V
-#define ELAN_VTG_DIG_MIN_UV 1800000
-#define ELAN_VTG_DIG_MAX_UV 1800000
-#define ELAN_ACTIVE_LOAD_DIG_UA 10000
-#define ELAN_LPM_LOAD_DIG_UA 10
 
 #define ELAN_I2C_VTG_MIN_UV 1800000
 #define ELAN_I2C_VTG_MAX_UV 1800000
@@ -95,10 +89,8 @@
 #ifdef ELAN_TEN_FINGERS
 #define PACKET_SIZE 40 /* support 10 fingers packet for nexus7 55 */
 #else
-#define PACKET_SIZE 8 /* support 2 fingers packet  */
-//#define PACKET_SIZE		24			/* support 5 fingers
-//packet
-//*/
+#define PACKET_SIZE 8 /* support 2 fingers packet */
+//#define PACKET_SIZE	24	/* support 5 fingers packet */
 #endif
 
 #define PWR_STATE_DEEP_SLEEP 0
@@ -118,11 +110,7 @@
 #define RESET_PKT 0x77
 #define CALIB_PKT 0x66
 
-// modify
-#define SYSTEM_RESET_PIN_SR 0 // nexus7 TEGRA_GPIO_PH6	62
-
-// Add these Define
-#define IAP_PORTION
+#define SYSTEM_RESET_PIN_SR 0
 #define PAGERETRY 30
 #define IAPRESTART 5
 
@@ -135,8 +123,8 @@
 #define IOCTL_IAP_MODE_LOCK _IOR(ELAN_IOCTLID, 5, int)
 #define IOCTL_CHECK_RECOVERY_MODE _IOR(ELAN_IOCTLID, 6, int)
 #define IOCTL_FW_VER _IOR(ELAN_IOCTLID, 7, int)
-#define IOCTL_X_RESOLUTION _IOR(ELAN_IOCTLID, 8, int)
-#define IOCTL_Y_RESOLUTION _IOR(ELAN_IOCTLID, 9, int)
+#define IOCTL_FW_X_RESOLUTION _IOR(ELAN_IOCTLID, 8, int)
+#define IOCTL_FW_Y_RESOLUTION _IOR(ELAN_IOCTLID, 9, int)
 #define IOCTL_FW_ID _IOR(ELAN_IOCTLID, 10, int)
 #define IOCTL_ROUGH_CALIBRATE _IOR(ELAN_IOCTLID, 11, int)
 #define IOCTL_IAP_MODE_UNLOCK _IOR(ELAN_IOCTLID, 12, int)
@@ -146,48 +134,50 @@
 #define IOCTL_POWER_UNLOCK _IOR(ELAN_IOCTLID, 16, int)
 #define IOCTL_FW_UPDATE _IOR(ELAN_IOCTLID, 17, int)
 #define IOCTL_BC_VER _IOR(ELAN_IOCTLID, 18, int)
+
+#ifdef ELAN_2WIREICE
 #define IOCTL_2WIREICE _IOR(ELAN_IOCTLID, 19, int)
+#endif
 
 #define CUSTOMER_IOCTLID 0xA0
 #define IOCTL_CIRCUIT_CHECK _IOR(CUSTOMER_IOCTLID, 1, int)
 #define IOCTL_GET_UPDATE_PROGREE _IOR(CUSTOMER_IOCTLID, 2, int)
 
-uint8_t RECOVERY = 0x00;
-int FW_VERSION = 0x00;
-int X_RESOLUTION = 576; // nexus7 1280
-int Y_RESOLUTION = 960; // nexus7 2112
-
-//[Arima Edison]++
-uint8_t chip_type = 0x00;
-//[Arima Edison]--
-
+/*
+ * Shuang Board X/Y resolution
+ */
 int LCM_X_RESOLUTION = 480;
 int LCM_Y_RESOLUTION = 800;
 
+// Initialize global variables
+uint8_t RECOVERY = 0x00;
+uint8_t chip_type = 0x00;
+
 int FW_ID = 0x00;
+int FW_VERSION = 0x00;
+int FW_X_RESOLUTION = 0x00;
+int FW_Y_RESOLUTION = 0x00;
 int work_lock = 0x00;
 int power_lock = 0x00;
 int circuit_ver = 0x01;
-/*++++i2c transfer start+++++++*/
 int file_fops_addr = 0x15;
-/*++++i2c transfer end+++++++*/
+int update_progree = 0;
 
+#ifdef ELAN_BUTTON
 int button_state = 0;
+#endif
 
 static int touch_panel_type;
 static unsigned short chip_reset_flag = 0;
-#ifdef IAP_PORTION
+static unsigned long chip_mode_set = 0;
+static unsigned long talking_mode_set = 0;
+
 uint8_t ic_status = 0x00; // 0:OK 1:master fail 2:slave fail
-int update_progree = 0;
 uint8_t I2C_DATA[3] = {0x15, 0x20, 0x21}; /*I2C devices address*/ // 1218 modify
-int is_OldBootCode = 0;						  // 0:new 1:old
 
 #ifdef PRODUCTION_TEST
 uint8_t raw_trace = 0;
 #endif
-
-static unsigned long chip_mode_set = 0;
-static unsigned long talking_mode_set = 0;
 
 /*The newest firmware, if update must be changed here*/
 static uint8_t file_fw_data_Truly_2127[] = {
@@ -215,7 +205,6 @@ enum { PageSize = 132,
 
 enum { E_FD = -1,
 };
-#endif
 
 struct elan_ktf2k_ts_data {
 	struct i2c_client *client;
@@ -223,7 +212,9 @@ struct elan_ktf2k_ts_data {
 	struct workqueue_struct *elan_wq;
 	struct work_struct work;
 	struct delayed_work check_work;
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
+#endif
 	struct elan_ktf2k_i2c_platform_data *pdata;
 	int intr_gpio;
 	int reset_gpio; // Arima Edison add
@@ -244,6 +235,7 @@ struct elan_ktf2k_ts_data {
 	struct notifier_block fb_notif;
 #endif
 };
+static struct elan_ktf2k_ts_data *private_ts;
 
 //[Arima Edison] ++
 static int elan_ktf2k_ts_parse_dt(struct device *,
@@ -256,7 +248,6 @@ static void elan_ktf2k_clear_ram(struct i2c_client *client);
 static int elan_ktf2k_set_scan_mode(struct i2c_client *client, int mode);
 //[Arima Edison]--
 
-static struct elan_ktf2k_ts_data *private_ts;
 static int elan_ktf2k_ts_setup(struct i2c_client *client);
 static int elan_ktf2k_ts_hw_reset(struct i2c_client *client);
 static int elan_ktf2k_ts_poll(struct i2c_client *client);
@@ -269,11 +260,8 @@ elan_ktf2k_ts_rough_calibrate(struct i2c_client *client); // Arima Edison mask
 static int elan_ktf2k_ts_resume(struct device *dev);
 static int elan_ktf2k_ts_suspend(struct device *dev);
 
-#ifdef IAP_PORTION
-int Update_FW_One(/*struct file *filp,*/ struct i2c_client *client,
-		  int recovery);
+int Update_FW_One(struct i2c_client *client, int recovery);
 static int __hello_packet_handler(struct i2c_client *client);
-#endif
 
 #ifdef ELAN_2WIREICE
 int elan_TWO_WIRE_ICE(struct i2c_client *client);
@@ -437,13 +425,13 @@ static long elan_iap_ioctl(struct file *filp, unsigned int cmd,
 		__fw_packet_handler(private_ts->client);
 		return FW_VERSION;
 		break;
-	case IOCTL_X_RESOLUTION:
+	case IOCTL_FW_X_RESOLUTION:
 		__fw_packet_handler(private_ts->client);
-		return X_RESOLUTION;
+		return FW_X_RESOLUTION;
 		break;
-	case IOCTL_Y_RESOLUTION:
+	case IOCTL_FW_Y_RESOLUTION:
 		__fw_packet_handler(private_ts->client);
-		return Y_RESOLUTION;
+		return FW_Y_RESOLUTION;
 		break;
 	case IOCTL_FW_ID:
 		__fw_packet_handler(private_ts->client);
@@ -463,14 +451,12 @@ static long elan_iap_ioctl(struct file *filp, unsigned int cmd,
 	case IOCTL_POWER_UNLOCK:
 		power_lock = 0;
 		break;
-#ifdef IAP_PORTION
 	case IOCTL_GET_UPDATE_PROGREE:
 		update_progree = (int __user)arg;
 		break;
 	case IOCTL_FW_UPDATE:
 		Update_FW_One(private_ts->client, 0);
 		break;
-#endif
 #ifdef ELAN_2WIREICE
 	case IOCTL_2WIREICE:
 		elan_TWO_WIRE_ICE(private_ts->client);
@@ -494,7 +480,6 @@ struct file_operations elan_touch_fops = {
     .unlocked_ioctl = elan_iap_ioctl,
 };
 
-#ifdef IAP_PORTION
 int EnterISPMode(struct i2c_client *client, uint8_t *isp_cmd)
 {
 	char buff[4] = {0};
@@ -670,8 +655,7 @@ IAP_RESTART:
 	// Start IAP
 	for (iPage = 1; iPage <= PageNum; iPage++) {
 	PAGE_REWRITE:
-#if 1 // 8byte mode
-		// 8 bytes
+		// 8 bytes mode
 		// szBuff = fw_data + ((iPage-1) * PageSize);
 		for (byte_count = 1; byte_count <= 17; byte_count++) {
 			if (byte_count != 17) {
@@ -695,8 +679,7 @@ IAP_RESTART:
 				res = WritePage(szBuff, 4);
 			}
 		} // end of for(byte_count=1;byte_count<=17;byte_count++)
-#endif
-#if 0 // 132byte mode		
+#if 0		  // 132byte mode
 		szBuff = file_fw_data + curIndex;
 		curIndex =  curIndex + PageSize;
 		res = WritePage(szBuff, PageSize);
@@ -728,7 +711,7 @@ IAP_RESTART:
 				}
 			} else {
 				restartCnt = restartCnt + 1;
-				if (restartCnt >= 5) {
+				if (restartCnt >= IAPRESTART) {
 					printk("[ELAN] ID 0x%02x ReStart %d "
 					       "times fails!\n",
 					       data, IAPRESTART);
@@ -756,8 +739,6 @@ IAP_RESTART:
 
 	return 0; // Arima edison add
 }
-
-#endif
 // End Firmware Update
 
 // Star 2wireIAP which used I2C to simulate JTAG function
@@ -2173,7 +2154,7 @@ static int __fw_packet_handler(struct i2c_client *client)
 	minor = ((buf_recv[2])) | ((buf_recv[3] & 0xf0) << 4);
 	ts->x_resolution = minor;
 #ifndef ELAN_TEN_FINGERS
-	X_RESOLUTION = ts->x_resolution;
+	FW_X_RESOLUTION = ts->x_resolution;
 #endif
 
 	// Y Resolution
@@ -2183,7 +2164,7 @@ static int __fw_packet_handler(struct i2c_client *client)
 	minor = ((buf_recv[2])) | ((buf_recv[3] & 0xf0) << 4);
 	ts->y_resolution = minor;
 #ifndef ELAN_TEN_FINGERS
-	Y_RESOLUTION = ts->y_resolution;
+	FW_Y_RESOLUTION = ts->y_resolution;
 #endif
 
 	printk(KERN_INFO "[elan] %s: Firmware version: 0x%4.4x\n", __func__,
@@ -2193,7 +2174,7 @@ static int __fw_packet_handler(struct i2c_client *client)
 	printk(KERN_INFO "[elan] %s: Bootcode Version: 0x%4.4x\n", __func__,
 	       ts->bc_ver);
 	printk(KERN_INFO "[elan] %s: x resolution: %d, y resolution: %d\n",
-	       __func__, X_RESOLUTION, Y_RESOLUTION);
+	       __func__, FW_X_RESOLUTION, FW_Y_RESOLUTION);
 
 	return 0;
 }
@@ -2980,13 +2961,13 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 					// &x);
 					// printk("[elan_debug] %s, x=%d,
 					// y=%d\n",__func__, x , y);
-					// x = X_RESOLUTION-x;
-					// y = Y_RESOLUTION-y;
+					// x = FW_X_RESOLUTION-x;
+					// y = FW_Y_RESOLUTION-y;
 
 					x = x * (LCM_X_RESOLUTION) /
-					    X_RESOLUTION;
+					    FW_X_RESOLUTION;
 					y = y * (LCM_Y_RESOLUTION) /
-					    Y_RESOLUTION;
+					    FW_Y_RESOLUTION;
 					// printk("[elan_debug] %s, x=%d,
 					// y=%d\n",__func__, x , y);
 
@@ -3550,89 +3531,80 @@ __set_bit(ABS_PRESSURE, ts->input_dev->absbit);	*/
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y, 0,
 			     LCM_Y_RESOLUTION, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
-// input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE,0, 255, 0, 0);
-// input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID, 0, 5, 0, 0);
+	// input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE,0, 255, 0, 0);
+	// input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID, 0, 5, 0, 0);
 
-// input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 100, 0, 0);
+	// input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0, 100, 0,
+	// 0);
 
-//__set_bit(EV_ABS, ts->input_dev->evbit);
-//__set_bit(EV_SYN, ts->input_dev->evbit);
-//__set_bit(EV_KEY, ts->input_dev->evbit);
+	//__set_bit(EV_ABS, ts->input_dev->evbit);
+	//__set_bit(EV_SYN, ts->input_dev->evbit);
+	//__set_bit(EV_KEY, ts->input_dev->evbit);
 
-// Start Firmware auto Update
-#ifdef IAP_PORTION
-	if (1) {
-		work_lock = 1;
-		power_lock = 1;
-/* FW ID & FW VER*/
-#if 1				       /**** For ektf21xx and ektf20xx  *****/
-		if (chip_type == 0x22) // 2227e
-		{
-			printk("[ELAN]  [7E65]=0x%02x,  [7E64]=0x%02x, "
-			       "[0x7E67]=0x%02x, [0x7E66]=0x%02x\n",
-			       file_fw_data[0x7E65], file_fw_data[0x7E64],
-			       file_fw_data[0x7E67], file_fw_data[0x7E66]);
-			New_FW_ID =
-			    file_fw_data[0x7E67] << 8 | file_fw_data[0x7E66];
-			New_FW_VER =
-			    file_fw_data[0x7E65] << 8 | file_fw_data[0x7E64];
-		} else // 2127e
-		{
-			printk("[ELAN]  [7D97]=0x%02x,  [7D96]=0x%02x, "
-			       "[0x7D99]=0x%02x, [0x7D98]=0x%02x\n",
-			       file_fw_data[0x7D97], file_fw_data[0x7D96],
-			       file_fw_data[0x7D99], file_fw_data[0x7D98]);
-			New_FW_ID =
-			    file_fw_data[0x7D67] << 8 | file_fw_data[0x7D66];
-			New_FW_VER =
-			    file_fw_data[0x7D65] << 8 | file_fw_data[0x7D64];
-		}
-#endif
+	// Start Firmware auto Update
+	work_lock = 1;
+	power_lock = 1;
+	/* FW ID & FW VER*/
+	if (chip_type == 0x22) // 2227e
+	{
+		printk("[ELAN]  [7E65]=0x%02x,  [7E64]=0x%02x, "
+		       "[0x7E67]=0x%02x, [0x7E66]=0x%02x\n",
+		       file_fw_data[0x7E65], file_fw_data[0x7E64],
+		       file_fw_data[0x7E67], file_fw_data[0x7E66]);
+		New_FW_ID = file_fw_data[0x7E67] << 8 | file_fw_data[0x7E66];
+		New_FW_VER = file_fw_data[0x7E65] << 8 | file_fw_data[0x7E64];
+	} else // 2127e
+	{
+		printk("[ELAN]  [7D97]=0x%02x,  [7D96]=0x%02x, "
+		       "[0x7D99]=0x%02x, [0x7D98]=0x%02x\n",
+		       file_fw_data[0x7D97], file_fw_data[0x7D96],
+		       file_fw_data[0x7D99], file_fw_data[0x7D98]);
+		New_FW_ID = file_fw_data[0x7D67] << 8 | file_fw_data[0x7D66];
+		New_FW_VER = file_fw_data[0x7D65] << 8 | file_fw_data[0x7D64];
+	}
 
 #if 0 /* for ektf31xx 2 wire ice ex: 2wireice -b xx.bin */
     	printk(" [7c16]=0x%02x,  [7c17]=0x%02x, [7c18]=0x%02x, [7c19]=0x%02x\n",  file_fw_data[31766],file_fw_data[31767],file_fw_data[31768],file_fw_data[31769]);
 		New_FW_ID = file_fw_data[31769]<<8  | file_fw_data[31768] ;	       
 		New_FW_VER = file_fw_data[31767]<<8  | file_fw_data[31766] ;
 #endif
-		/* for ektf31xx iap ekt file   */
-		//	printk(" [7bd8]=0x%02x,  [7bd9]=0x%02x, [7bda]=0x%02x,
-		//[7bdb]=0x%02x\n",
-		// file_fw_data[31704],file_fw_data[31705],file_fw_data[31706],file_fw_data[31707]);
-		//	New_FW_ID = file_fw_data[31707]<<8  |
-		// file_fw_data[31708] ;
-		//	New_FW_VER = file_fw_data[31705]<<8  |
-		// file_fw_data[31704] ;
-		printk(" FW_ID=0x%x,   New_FW_ID=0x%x \n", FW_ID, New_FW_ID);
-		printk(
-		    " FW_VERSION=0x%x,   New_FW_VER=0x%x,  chip_type=0x%x \n",
-		    FW_VERSION, New_FW_VER, chip_type);
+	/* for ektf31xx iap ekt file   */
+	//	printk(" [7bd8]=0x%02x,  [7bd9]=0x%02x, [7bda]=0x%02x,
+	//[7bdb]=0x%02x\n",
+	// file_fw_data[31704],file_fw_data[31705],file_fw_data[31706],file_fw_data[31707]);
+	//	New_FW_ID = file_fw_data[31707]<<8  |
+	// file_fw_data[31708] ;
+	//	New_FW_VER = file_fw_data[31705]<<8  |
+	// file_fw_data[31704] ;
+	printk(" FW_ID=0x%x,   New_FW_ID=0x%x \n", FW_ID, New_FW_ID);
+	printk(" FW_VERSION=0x%x,   New_FW_VER=0x%x,  chip_type=0x%x \n",
+	       FW_VERSION, New_FW_VER, chip_type);
 
-		// for firmware auto-upgrade
+	// for firmware auto-upgrade
 
-		if (New_FW_ID == FW_ID) {
-			if (New_FW_VER > (FW_VERSION)) {
-				Update_FW_One(client, RECOVERY);
-				FW_VERSION = New_FW_VER;
-				ts->input_dev->id.version = FW_VERSION;
-			} else
-				printk("We do not NEED update TOUCH FW !! \n");
-		} else {
-			printk("FW_ID is different!");
-		}
-
-		if (FW_ID == 0) {
-			RECOVERY = 0x80;
+	if (New_FW_ID == FW_ID) {
+		if (New_FW_VER > (FW_VERSION)) {
 			Update_FW_One(client, RECOVERY);
 			FW_VERSION = New_FW_VER;
 			ts->input_dev->id.version = FW_VERSION;
-		}
-
-		power_lock = 0;
-		work_lock = 0;
-
-		// enable_irq(ts->client->irq);
+		} else
+			printk("We do not NEED update TOUCH FW !! \n");
+	} else {
+		printk("FW_ID is different!");
 	}
-#endif // End Firmware auto Update
+
+	if (FW_ID == 0) {
+		RECOVERY = 0x80;
+		Update_FW_One(client, RECOVERY);
+		FW_VERSION = New_FW_VER;
+		ts->input_dev->id.version = FW_VERSION;
+	}
+
+	power_lock = 0;
+	work_lock = 0;
+
+	// enable_irq(ts->client->irq);
+	// End Firmware auto Update
 
 	err = input_register_device(ts->input_dev);
 	if (err) {
@@ -3718,7 +3690,9 @@ static int elan_ktf2k_ts_remove(struct i2c_client *client)
 
 	elan_touch_sysfs_deinit();
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&ts->early_suspend);
+#endif
 	free_irq(client->irq, ts);
 
 	if (ts->elan_wq)
