@@ -395,9 +395,9 @@ static long elan_iap_ioctl(struct file *filp, unsigned int cmd,
 	case IOCTL_RESET:
 		// modify
 		gpio_set_value(SYSTEM_RESET_PIN_SR, 0);
-		msleep(20);
+		usleep_range(19500,20000);
 		gpio_set_value(SYSTEM_RESET_PIN_SR, 1);
-		msleep(5);
+		usleep_range(5000,5500);
 		printk(KERN_EMERG "elan_iap_ioctl : IOCTL_RESET\n ");
 		break;
 	case IOCTL_IAP_MODE_LOCK:
@@ -651,7 +651,7 @@ IAP_RESTART:
 	if (res != sizeof(data)) {
 		printk("[ELAN] dummy error code = %d\n", res);
 	}
-	msleep(10);
+	usleep_range(10000, 10500);
 
 	// Start IAP
 	for (iPage = 1; iPage <= PageNum; iPage++) {
@@ -730,7 +730,7 @@ IAP_RESTART:
 			print_progress(iPage, ic_num, i);
 		}
 
-		msleep(10);
+		usleep_range(10000, 10500);
 	} // end of for(iPage = 1; iPage <= PageNum; iPage++)
 
 	printk("[ELAN] read Hello packet data!\n");
@@ -1782,7 +1782,7 @@ static ssize_t elan_ktf2k_mode_set(struct device *dev,
 			elan_ktf2k_ts_set_mode_state(private_ts->client,
 						     chip_mode_set);
 		}
-		msleep(10);
+		usleep_range(10000, 10500);
 		elan_ktf2k_set_scan_mode(private_ts->client, 1);
 	} else {
 		elan_ktf2k_ts_set_mode_state(private_ts->client, chip_mode_set);
@@ -1845,7 +1845,7 @@ static ssize_t elan_ktf2k_talking_set(struct device *dev,
 			elan_ktf2k_ts_set_talking_state(private_ts->client,
 							talking_mode_set);
 		}
-		msleep(10);
+		usleep_range(10000, 10500);
 		elan_ktf2k_set_scan_mode(private_ts->client, 1);
 	} else {
 		printk(KERN_EMERG "%s 2127e \n", __func__);
@@ -2017,7 +2017,7 @@ static int __elan_ktf2k_ts_poll(struct i2c_client *client)
 		retry--;
 		if (status == 1) // [Arima Edison] we do not need delay if chip
 				 // work normally
-			msleep(25);
+			usleep_range(19500,20000);
 	} while (status == 1 && retry > 0);
 
 	return (status == 0 ? 0 : -ETIMEDOUT);
@@ -2484,7 +2484,7 @@ static int elan_ktf2k_ts_get_raw_data_disable(struct i2c_client *client)
 		return -EINVAL;
 	}
 
-	msleep(10);
+	usleep_range(10000, 10500);
 
 	return 0;
 }
@@ -2519,7 +2519,7 @@ static int elan_ktf2k_ts_set_mode_state(struct i2c_client *client, int mode)
 			__func__);
 		return -EINVAL;
 	}
-	msleep(1);
+	usleep_range(1000, 1500);
 	return 0;
 }
 /* 53 56 00 01*/
@@ -2562,7 +2562,7 @@ static int elan_ktf2k_ts_set_talking_state(struct i2c_client *client, int mode)
 			__func__);
 		return -EINVAL;
 	}
-	msleep(1);
+	usleep_range(1000, 1500);
 	return 0;
 }
 
@@ -2630,7 +2630,7 @@ static int elan_ktf2k_set_scan_mode(struct i2c_client *client, int mode)
 				__func__, mode);
 			return -EINVAL;
 		}
-		msleep(1);
+		usleep_range(1000, 1500);
 	}
 	return 0;
 }
@@ -2680,9 +2680,9 @@ static int elan_ktf2k_ts_hw_reset(struct i2c_client *client)
 {
 	// touch_debug(DEBUG_INFO, "[ELAN] Start HW reset!\n");
 	gpio_direction_output(SYSTEM_RESET_PIN_SR, 0);
-	msleep(20);
+	usleep_range(19500,20000);
 	gpio_direction_output(SYSTEM_RESET_PIN_SR, 1);
-	msleep(130);
+	msleep(125);
 	return 0;
 }
 
@@ -2879,7 +2879,7 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 						    private_ts->client,
 						    talking_mode_set);
 					}
-					msleep(10);
+					usleep_range(10000, 10500);
 					elan_ktf2k_set_scan_mode(
 					    private_ts->client, 1);
 				} else {
@@ -2900,7 +2900,7 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 						    private_ts->client,
 						    talking_mode_set);
 					}
-					msleep(10);
+					usleep_range(10000, 10500);
 				}
 				mutex_unlock(&private_ts->lock); // set lock
 			}
@@ -3061,7 +3061,7 @@ static void elan_ktf2k_ts_check_work_func(struct work_struct *work)
 				elan_ktf2k_ts_set_talking_state(
 				    private_ts->client, talking_mode_set);
 			}
-			msleep(10);
+			usleep_range(10000, 10500);
 			elan_ktf2k_set_scan_mode(private_ts->client, 1);
 		} else {
 			elan_ktf2k_ts_set_mode_state(private_ts->client,
@@ -3796,7 +3796,7 @@ static int elan_ktf2k_ts_resume(struct device *dev)
 					enter into suspend mode.  */
 		{
 			gpio_direction_output(SYSTEM_RESET_PIN_SR, 0);
-			msleep(5);
+			usleep_range(5000,5500);
 			gpio_direction_output(SYSTEM_RESET_PIN_SR, 1);
 			msleep(150);
 
@@ -3824,7 +3824,7 @@ static int elan_ktf2k_ts_resume(struct device *dev)
 					    private_ts->client,
 					    talking_mode_set);
 				}
-				msleep(10);
+				usleep_range(10000, 10500);
 				elan_ktf2k_set_scan_mode(private_ts->client, 1);
 			} else {
 				elan_ktf2k_ts_set_mode_state(private_ts->client,
