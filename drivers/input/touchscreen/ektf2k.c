@@ -1322,6 +1322,8 @@ static void elan_ktf2k_ts_report_data(struct i2c_client *client, uint8_t *buf)
 	}
 
 	switch (buf[0]) {
+	case 0x78:
+		break;
 	case HELLO_PKT:
 		// chip may reset due to watch dog
 		if (chip_type == TOUCH_2227 && buf[1] == 0x55 &&
