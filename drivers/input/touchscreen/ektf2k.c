@@ -862,9 +862,6 @@ static int __elan_ktf2k_ts_poll(struct i2c_client *client)
 	do {
 		status = gpio_get_value(pdata->intr_gpio);
 		retry--;
-		// [Arima Edison] we do not need delay if chip work normally
-		if (status == 1)
-			msleep(25);
 	} while (status == 1 && retry > 0);
 
 	return (status == 0 ? 0 : -ETIMEDOUT);
@@ -1457,12 +1454,6 @@ static void elan_ktf2k_ts_work_func(struct work_struct *work)
 	    container_of(work, struct elan_ktf2k_ts_data, work);
 	uint8_t buf[4 + PACKET_SIZE] = {0};
 	chip_reset_flag = 0;
-
-	if (gpio_get_value(pdata->intr_gpio)) {
-		pr_err("%s: Detected the jitter on INT pin\n", __func__);
-		enable_irq(ts->client->irq);
-		return;
-	}
 
 	rc = elan_ktf2k_ts_recv_data(ts->client, buf, 4 + PACKET_SIZE);
 	if (rc < 0) {
