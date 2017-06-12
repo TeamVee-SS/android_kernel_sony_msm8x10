@@ -299,8 +299,10 @@ static unsigned long msm_cpp_queue_buffer_info(struct cpp_device *cpp_dev,
 	return buff->map_info.phy_addr;
 
 QUEUE_BUFF_ERROR2:
-	ion_free(cpp_dev->client, buff->map_info.ion_handle);
+	ion_unmap_iommu(cpp_dev->client, buff->map_info.ion_handle,
+		cpp_dev->domain_num, 0);
 QUEUE_BUFF_ERROR1:
+	ion_free(cpp_dev->client, buff->map_info.ion_handle);
 	buff->map_info.ion_handle = NULL;
 	kzfree(buff);
 
