@@ -48,6 +48,8 @@ static const unsigned long sigreturn_codes[7] = {
 	MOV_R7_NR_RT_SIGRETURN, SWI_SYS_RT_SIGRETURN, SWI_THUMB_RT_SIGRETURN,
 };
 
+static unsigned long signal_return_offset;
+
 /*
  * atomically swap in the new signal mask, and wait for a signal.
  */
