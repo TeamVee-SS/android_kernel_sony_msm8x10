@@ -34,7 +34,7 @@
 	soc: soc { };
 };
 
-/include/ "../msm8610-camera.dtsi"
+/* /include/ "../msm8610-camera.dtsi" */
 /include/ "../msm-iommu-v0.dtsi"
 /include/ "msm8610-shuang-ion.dtsi"
 /include/ "../msm8610-gpu.dtsi"
